@@ -992,14 +992,40 @@ list_copy_deep(const List *oldlist)
  *
  * This is based on qsort(), so it likewise has O(N log N) runtime.
  */
+void
+list_sort(List *list, list_sort_comparator cmp)
+{
+	typedef int (*qsort_comparator) (const void *a, const void *b);
+	int			len;
 
+	check_list_invariants(list);
+
+	/* Nothing to do if there's less than two elements */
+	len = list_length(list);
+	if (len > 1)
+		qsort(list->elements, len, sizeof(ListCell), (qsort_comparator) cmp);
+}
 
 /*
  * list_sort comparator for sorting a list into ascending int order.
  */
+int
+list_int_cmp(const ListCell *p1, const ListCell *p2)
+{
+	int			v1 = lfirst_int(p1);
+	int			v2 = lfirst_int(p2);
 
+	return pg_cmp_s32(v1, v2);
+}
 
 /*
  * list_sort comparator for sorting a list into ascending OID order.
  */
+int
+list_oid_cmp(const ListCell *p1, const ListCell *p2)
+{
+	Oid			v1 = lfirst_oid(p1);
+	Oid			v2 = lfirst_oid(p2);
 
+	return pg_cmp_u32(v1, v2);
+}
