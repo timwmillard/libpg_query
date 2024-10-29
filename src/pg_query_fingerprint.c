@@ -383,6 +383,65 @@ PgQueryFingerprintResult pg_query_fingerprint_with_opts(const char* input, int p
 	return result;
 }
 
+PgQueryFingerprintResult pg_query_fingerprint_from_tree_with_opts(const void *tree, int parser_options, bool printTokens)
+{
+	MemoryContext ctx = NULL;
+	PgQueryInternalParsetreeAndError parsetree_and_error;
+	PgQueryFingerprintResult result = {0};
+
+	ctx = pg_query_enter_memory_context();
+
+    parsetree_and_error.tree = (List *)tree;
+
+	// These are all malloc-ed and will survive exiting the memory context, the caller is responsible to free them now
+	result.stderr_buffer = parsetree_and_error.stderr_buffer;
+	result.error = parsetree_and_error.error;
+
+	if (parsetree_and_error.tree != NULL || result.error == NULL) {
+		FingerprintContext ctx;
+		XXH64_canonical_t chash;
+
+		_fingerprintInitContext(&ctx, NULL, printTokens);
+
+		if (parsetree_and_error.tree != NULL) {
+			_fingerprintNode(&ctx, parsetree_and_error.tree, NULL, NULL, 0);
+		}
+
+		if (printTokens) {
+			dlist_iter iter;
+
+			printf("[");
+
+			dlist_foreach(iter, &ctx.tokens)
+			{
+				FingerprintToken *token = dlist_container(FingerprintToken, list_node, iter.cur);
+
+				printf("\"%s\", ", token->str);
+			}
+
+			printf("]\n");
+		}
+
+		result.fingerprint = XXH3_64bits_digest(ctx.xxh_state);
+		_fingerprintFreeContext(&ctx);
+
+		XXH64_canonicalFromHash(&chash, result.fingerprint);
+		result.fingerprint_str = malloc(17 * sizeof(char));
+		int n = snprintf(result.fingerprint_str, 17, "%02x%02x%02x%02x%02x%02x%02x%02x",
+						   chash.digest[0], chash.digest[1], chash.digest[2], chash.digest[3],
+						   chash.digest[4], chash.digest[5], chash.digest[6], chash.digest[7]);
+		if (n < 0 || n >= 17) {
+			PgQueryError* error = malloc(sizeof(PgQueryError));
+			error->message = strdup("Failed to output fingerprint string due to snprintf failure");
+			result.error = error;
+		}
+	}
+
+	pg_query_exit_memory_context(ctx);
+
+	return result;
+}
+
 PgQueryFingerprintResult pg_query_fingerprint(const char* input)
 {
 	return pg_query_fingerprint_with_opts(input, PG_QUERY_PARSE_DEFAULT, false);
@@ -391,6 +450,16 @@ PgQueryFingerprintResult pg_query_fingerprint(const char* input)
 PgQueryFingerprintResult pg_query_fingerprint_opts(const char* input, int parser_options)
 {
 	return pg_query_fingerprint_with_opts(input, parser_options, false);
+}
+
+PgQueryFingerprintResult pg_query_fingerprint_from_tree(const void* tree)
+{
+	return pg_query_fingerprint_from_tree_with_opts(tree, PG_QUERY_PARSE_DEFAULT, false);
+}
+
+PgQueryFingerprintResult pg_query_fingerprint_from_tree_opts(const void* tree, int parser_options)
+{
+	return pg_query_fingerprint_from_tree_with_opts(tree, parser_options, false);
 }
 
 void pg_query_free_fingerprint_result(PgQueryFingerprintResult result)
