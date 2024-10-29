@@ -115,9 +115,8 @@ PgQueryFingerprintResult pg_query_fingerprint_opts(const char* input, int parser
 PgQueryFingerprintResult pg_query_fingerprint_from_tree(const void *tree);
 PgQueryFingerprintResult pg_query_fingerprint_from_tree_opts(const void *tree, int parser_options);
 
-
-PgQueryParsetreeResult pg_query_parse_tree_opts(const char* input, int parser_options);
-PgQueryParsetreeResult pg_query_parse_tree(const char* input, int parser_options);
+PgQueryParsetreeResult pg_query_parsetree(const char* input);
+PgQueryParsetreeResult pg_query_parsetree_opts(const char* input, int parser_options);
 
 // Use pg_query_split_with_scanner when you need to split statements that may
 // contain parse errors, otherwise pg_query_split_with_parser is recommended
