@@ -115,6 +115,20 @@ PgQueryInternalParsetreeAndError pg_query_raw_parse(const char* input, int parse
 	return result;
 }
 
+PgQueryParsetreeResult pg_query_parse_tree_opts(const char* input, int parser_options) {
+    PgQueryInternalParsetreeAndError result;
+    result = pg_query_raw_parse(input, parser_options); 
+    return (PgQueryParsetreeResult){
+        .tree = result.tree,
+        .stderr_buffer = result.stderr_buffer,
+        .error = result.error,
+    };
+}
+
+PgQueryParsetreeResult pg_query_parse_tree(const char* input, int parser_options) {
+    return pg_query_parse_tree_opts(input, PG_QUERY_PARSE_DEFAULT);
+}
+
 PgQueryParseResult pg_query_parse(const char* input)
 {
 	return pg_query_parse_opts(input, PG_QUERY_PARSE_DEFAULT);
