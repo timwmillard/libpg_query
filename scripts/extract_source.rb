@@ -102,7 +102,11 @@ class Runner
       @basepath + 'src/port/win32error.c', # Win32 only
       @basepath + 'src/port/win32env.c', # Win32 only
       @basepath + 'src/port/win32security.c', # Win32 only
-      @basepath + 'src/port/gettimeofday.c', # Win32 only
+      @basepath + 'src/port/win32gettimeofday.c', # Win32 only
+      @basepath + 'src/port/win32pwrite.c', # Win32 only
+      @basepath + 'src/port/win32pread.c', # Win32 only
+      @basepath + 'src/port/win32link.c', # Win32 only
+      @basepath + 'src/port/win32getrusage.c', # Win32 only
       @basepath + 'src/port/strnlen.c', # Not needed and conflicts with available function
       @basepath + 'src/port/strlcat.c', # Not needed and conflicts with available function
       @basepath + 'src/port/unsetenv.c', # Not needed and conflicts with available function
@@ -116,6 +120,8 @@ class Runner
       @basepath + 'src/backend/libpq/be-gssapi-common.c', # Requires GSSAPI (which we don't want to require)
       @basepath + 'src/backend/libpq/be-secure-gssapi.c', # Requires GSSAPI (which we don't want to require)
       @basepath + 'src/common/protocol_openssl.c', # Requires OpenSSL (which we don't want to require)
+      @basepath + 'contrib/pgcrypto/pgp-mpi-openssl.c', # Requires OpenSSL (which we don't want to require)
+      @basepath + 'contrib/pgcrypto/openssl.c', # Requires OpenSSL (which we don't want to require)
     ] -
     Dir.glob(@basepath + 'src/backend/port/dynloader/*.c') -
     Dir.glob(@basepath + 'src/backend/port/win32/*.c') -
@@ -596,6 +602,44 @@ static PLpgSQL_type * parse_datatype(const char *string, int location) {
 	return typ;
 }
 ))
+runner.mock('plpgsql_build_datatype_arrayof', %(
+PLpgSQL_type * plpgsql_build_datatype_arrayof(PLpgSQL_type *dtype)
+{
+	if (dtype->typisarray)
+		return dtype;
+
+	PLpgSQL_type *array_type;
+	array_type = (PLpgSQL_type *) palloc0(sizeof(PLpgSQL_type));
+
+	array_type->ttype = PLPGSQL_TTYPE_REC;
+	array_type->atttypmod = dtype->atttypmod;
+	array_type->collation = dtype->collation;
+
+	array_type->typisarray = true;
+
+	switch(dtype->typoid)
+	{
+		case BOOLOID:
+			array_type->typoid = BOOLARRAYOID;
+			array_type->typname = pstrdup("boolean[]");
+			break;
+		case INT4OID:
+			array_type->typoid = INT4ARRAYOID;
+			array_type->typname = pstrdup("integer[]");
+			break;
+		case TEXTOID:
+			array_type->typoid = TEXTARRAYOID;
+			array_type->typname = pstrdup("text[]");
+			break;
+		default:
+			array_type->typname = pstrdup("UNKNOWN");
+			break;
+	}
+	array_type->typoid = dtype->typoid;
+
+	return array_type;
+}
+))
 runner.mock('get_collation_oid', 'Oid get_collation_oid(List *name, bool missing_ok) { return DEFAULT_COLLATION_OID; }')
 runner.mock('plpgsql_parse_wordtype', 'PLpgSQL_type * plpgsql_parse_wordtype(char *ident) { return NULL; }')
 runner.mock('plpgsql_parse_wordrowtype', 'PLpgSQL_type * plpgsql_parse_wordrowtype(char *ident) { return NULL; }')
@@ -662,6 +706,8 @@ runner.deep_resolve('AllocSetContextCreate')
 runner.deep_resolve('MemoryContextSwitchTo')
 runner.deep_resolve('CurrentMemoryContext')
 runner.deep_resolve('MemoryContextDelete')
+runner.deep_resolve('MemoryContextAllocZero')
+runner.deep_resolve('MemoryContextSizeFailure')
 runner.deep_resolve('AllocSetDeleteFreeList')
 runner.deep_resolve('palloc0')
 
